@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence xmlns="http://ws.apache.org/ns/synapse"
+          name="LOG_RESPONSE_MFS_LOGGING"
+          onError="sunErrorHandler"
+          trace="enable">
+   <property name="JSON_RESPONSE" expression="json-eval($.)"/>
+   <dbreport>
+      <connection>
+         <pool>
+            <dsName>jdbc/mfsdsn</dsName>
+         </pool>
+      </connection>
+      <statement>
+         <sql>INSERT INTO MFS.apim_log_response(transactionId, ApiName, interfaceName,response,ResponseTime, msisdn, status)  values (?, ?, ?, ?, Now(), ?, ?)</sql>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:OriginatorConversationID"
+                    type="VARCHAR"/>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:API_NAME"
+                    type="VARCHAR"/>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:INTERFACE_NAME"
+                    type="VARCHAR"/>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:JSON_RESPONSE"
+                    type="VARCHAR"/>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:identifier"
+                    type="VARCHAR"/>
+         <parameter xmlns:ns="http://org.apache.synapse/xsd"
+                    expression="$ctx:LOG_RESPONSE_STATUS"
+                    type="VARCHAR"/>
+      </statement>
+   </dbreport>
+</sequence>

@@ -1,0 +1,1365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<api xmlns="http://ws.apache.org/ns/synapse"
+     name="QueryBalancenew1"
+     context="/mm/accounts">
+   <resource methods="GET" uri-template="/msisdn/{msisdn}/balance">
+      <inSequence>
+         <property name="API_NAME" value="Accounts"/>
+         <property name="INTERFACE_NAME" value="QueryBalance"/>
+         <log level="custom">
+            <property name="=========== FLOW STARTED" value="****"/>
+            <property name="accesstokenheader" expression="$trp:Authorization"/>
+            <property name="Date" expression="$trp:Request-Date"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+            <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+            <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         </log>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="transactionName" value="QueryBalance"/>
+         <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+         <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+         <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+         <property name="INTERFACE_NAME" value="QueryBalance"/>
+         <property name="URI"
+                   expression="fn:concat('/msisdn/',$ctx:identifier,'/balance')"/>
+         <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+         <clone continueParent="true">
+            <target sequence="LOG_REQUEST_MFS_LOGGING"/>
+         </clone>
+         <class name="com.arcana.validation.userid.UseridValidation"/>
+         <log level="custom">
+            <property name="check" expression="$ctx:Check"/>
+         </log>
+         <class name="com.arcana.abdulrab.QueryBalanceIN"/>
+         <log level="custom">
+            <property name="After class" value="****"/>
+            <property name="pin" expression="$ctx:decryptmpin"/>
+         </log>
+         <payloadFactory media-type="xml">
+            <format key="conf:/repository/esb/querybalance"/>
+            <args>
+               <arg evaluator="xml" expression="$ctx:identifier"/>
+               <arg evaluator="xml" expression="$ctx:decryptmpin"/>
+               <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+               <arg value="20130402152345"/>
+            </args>
+         </payloadFactory>
+         <log level="full"/>
+         <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+         <property name="messageType" value="text/xml"/>
+         <call>
+            <endpoint key="CPS"/>
+         </call>
+         <property name="messageType" value="application/xml" scope="axis2"/>
+         <property xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                   name="CDATAPAYLOAD"
+                   expression="//res:ResponseMsg"
+                   scope="default"
+                   type="OM"/>
+         <enrich>
+            <source type="property" clone="true" property="CDATAPAYLOAD"/>
+            <target xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                    xpath="//res:ResponseMsg/text()"/>
+         </enrich>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseCode"
+                   expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseDesc"
+                   expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+         <switch source="$ctx:ResponseCode">
+            <case regex="0"><!--check response code case 0--><class name="com.arcana.abdulrab.checkresponse"/>
+               <switch source="$ctx:resultCode1">
+                  <case regex="0">
+                     <payloadFactory media-type="json">
+                        <format>{  "currentBalance": "",  "$1": "$2",  "$3": "$4",  "unclearedBalance": "",  "currency": "PKR",  "status": ""}</format>
+                        <args>
+                           <arg evaluator="xml" expression="$ctx:availableBalanceKey"/>
+                           <arg evaluator="xml" expression="$ctx:availableBalanceVal"/>
+                           <arg evaluator="xml" expression="$ctx:reservedBalanceKey"/>
+                           <arg evaluator="xml" expression="$ctx:reservedBalanceVal"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="LOG_RESPONSE_STATUS" value="SUCCESS"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                  </case>
+                  <default>
+                     <property name="ResultCode1" expression="$ctx:resultCode1"/>
+                     <class name="com.wso2.esb.mfs.errorhandling.ErrorHandling"/>
+                     <property name="concatedresponse"
+                               expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                     <payloadFactory media-type="json">
+                        <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                        <args>
+                           <arg value="Validation"/>
+                           <arg evaluator="xml" expression="$ctx:statusCode"/>
+                           <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                           <arg evaluator="xml" expression="$ctx:currentTime"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                     <property name="HTTP_SC"
+                               expression="$ctx:statusCode"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" action="remove"/>
+                  </default>
+               </switch>
+               <send/>
+            </case>
+            <default><!--check response code default--><payloadFactory media-type="json">
+                  <format> {  "errorCategory": "Validation",  "errorCode": "$1",  "errorDescription": "$2",  "errorDateTime": "$3"  }   </format>
+                  <args>
+                     <arg evaluator="xml" expression="$ctx:ResponseCode"/>
+                     <arg evaluator="xml" expression="$ctx:ResponseDesc"/>
+                     <arg evaluator="xml" expression="$ctx:currentTime"/>
+                  </args>
+               </payloadFactory>
+               <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+               <property name="LOG_RESPONSE_STATUS" value="Validation Failure"/>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </default>
+         </switch>
+      </inSequence>
+      <outSequence/>
+   </resource>
+   <resource methods="GET" uri-template="/msisdn/{msisdn}/bills">
+      <inSequence>
+         <log level="custom">
+            <property name="=========== FLOW STARTED" value="****"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+            <property name="Date" expression="$trp:Request-Date"/>
+            <property name="ConsumerRefNum" expression="$trp:billReference"/>
+            <property name="CompanyCode" expression="$trp:CompanyCode"/>
+            <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+            <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+         </log>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="transactionName" value="QueryBill"/>
+         <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+         <property name="ConsumerRefNum" expression="$trp:billReference"/>
+         <property name="CompanyCode" expression="$trp:CompanyCode"/>
+         <property name="TimeStamp" expression="$trp:Date"/>
+         <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+         <clone continueParent="true">
+            <target sequence="LOG_REQUEST_MFS_LOGGING"/>
+         </clone>
+         <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+         <class name="com.wso2.esb.mfs.querybill.QueryBalanceIN"/>
+         <log level="custom">
+            <property name="After class" value="****"/>
+            <property name="Date" expression="$ctx:dateconverted"/>
+         </log>
+         <payloadFactory media-type="xml">
+            <format key="conf:/repository/esb/querybill"/>
+            <args>
+               <arg evaluator="xml" expression="$ctx:identifier"/>
+               <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+               <arg evaluator="xml" expression="$ctx:dateconverted"/>
+               <arg evaluator="xml" expression="$ctx:ConsumerRefNum"/>
+               <arg evaluator="xml" expression="$ctx:CompanyCode"/>
+            </args>
+         </payloadFactory>
+         <enrich>
+            <source type="envelope" clone="true"/>
+            <target type="property" property="LOG_RESPONSE"/>
+         </enrich>
+         <log level="custom">
+            <property name="request" expression="$ctx:LOG_RESPONSE"/>
+         </log>
+         <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+         <property name="messageType" value="text/xml"/>
+         <call>
+            <endpoint key="CPS"/>
+         </call>
+         <enrich>
+            <source type="envelope" clone="true"/>
+            <target type="property" property="LOG_RESPONSE"/>
+         </enrich>
+         <log level="custom">
+            <property name="request" expression="$ctx:LOG_RESPONSE"/>
+         </log>
+         <property name="messageType" value="application/xml" scope="axis2"/>
+         <property xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                   name="CDATAPAYLOAD"
+                   expression="//res:ResponseMsg"
+                   scope="default"
+                   type="OM"/>
+         <enrich>
+            <source type="property" clone="true" property="CDATAPAYLOAD"/>
+            <target xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                    xpath="//res:ResponseMsg/text()"/>
+         </enrich>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseCode"
+                   expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseDesc"
+                   expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+         <switch source="get-property('ResponseCode')">
+            <case regex="0">
+               <class name="com.wso2.esb.mfs.querybill.checkresponse"/>
+               <property name="responseCode" expression="$ctx:resultCode1"/>
+               <property name="dueAmount" expression="$ctx:dueAmount"/>
+               <property name="dueDate" expression="$ctx:dueDate"/>
+               <property name="consumerRefNum" expression="$ctx:consumerRefNum"/>
+               <property name="miniAmount" expression="$ctx:miniAmount"/>
+               <property name="billStatus" expression="$ctx:billStatus"/>
+               <log level="custom">
+                  <property name="responseCode" expression="$ctx:resultCode1"/>
+                  <property name="dueAmount" expression="$ctx:dueAmount"/>
+                  <property name="dueDate" expression="$ctx:dueDate"/>
+                  <property name="consumerRefNum" expression="$ctx:consumerRefNum"/>
+                  <property name="miniAmount" expression="$ctx:miniAmount"/>
+                  <property name="billStatus" expression="$ctx:billStatus"/>
+               </log>
+               <switch source="$ctx:responseCode">
+                  <case regex="0">
+                     <payloadFactory media-type="json">
+                        <format>[  {    "currency": "PKR",    "amountDue": "$1",    "dueDate": "$2",    "billReference": "$3",    "minimumAmountDue": "$4",    "billDescription": "", "billStatus": "$5",    "metadata": [      {        "key": "",        "value": ""      }    ]  }]</format>
+                        <args>
+                           <arg evaluator="xml" expression="$ctx:dueAmount"/>
+                           <arg evaluator="xml" expression="$ctx:dueDate"/>
+                           <arg evaluator="xml" expression="$ctx:consumerRefNum"/>
+                           <arg evaluator="xml" expression="$ctx:miniAmount"/>
+                           <arg evaluator="xml" expression="$ctx:billStatus"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="LOG_RESPONSE_STATUS" value="SUCCESS"/>
+                  </case>
+                  <default>
+                     <property name="ResultCode1" expression="$ctx:responseCode"/>
+                     <class name="com.wso2.esb.mfs.errorhandling.ErrorHandling"/>
+                     <property name="concatedresponse"
+                               expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                     <switch source="get-property('flag')">
+                        <case regex="0">
+                           <payloadFactory media-type="json">
+                              <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                              <args>
+                                 <arg value="Validation"/>
+                                 <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                 <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                 <arg evaluator="xml" expression="$ctx:currentTime"/>
+                              </args>
+                           </payloadFactory>
+                           <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                           <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                           <property name="HTTP_SC"
+                                     expression="$ctx:statusCode"
+                                     scope="axis2"
+                                     type="STRING"/>
+                           <property name="messageType"
+                                     value="application/json"
+                                     scope="axis2"
+                                     type="STRING"/>
+                           <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                           <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                           <header name="To" scope="default" action="remove"/>
+                           <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                        </case>
+                        <case regex="1">
+                           <payloadFactory media-type="json">
+                              <format>{ "Error":"Result not Recieved" }</format>
+                              <args/>
+                           </payloadFactory>
+                           <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+                           <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                           <clone continueParent="true">
+                              <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                           </clone>
+                           <respond/>
+                        </case>
+                        <default/>
+                     </switch>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <send/>
+                  </default>
+               </switch>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </case>
+            <default>
+               <payloadFactory media-type="json">
+                  <format> {  "errorCategory": "Validation",  "errorCode": "$1",  "errorDescription": "$2",  "errorDateTime": "$3"  }   </format>
+                  <args>
+                     <arg evaluator="xml" expression="$ctx:ResponseCode"/>
+                     <arg evaluator="xml" expression="$ctx:ResponseDesc"/>
+                     <arg evaluator="xml" expression="$ctx:currentTime"/>
+                  </args>
+               </payloadFactory>
+               <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+               <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </default>
+         </switch>
+      </inSequence>
+   </resource>
+   <resource methods="GET" uri-template="/msisdn/{msisdn}/status">
+      <inSequence>
+         <log level="custom">
+            <property name="=========== FLOW STARTED" value="****"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID'"/>
+            <property name="Date" expression="$trp:Request-Date"/>
+            <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+            <property name="TargetMSISDN" expression="$trp:X-Account-Id-MSISDN"/>
+            <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+            <property name="TargetCNIC" expression="$trp:X-Account-Id-CNIC"/>
+         </log>
+         <property name="CACHE_URI" expression="get-property('To')"/>
+         <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="INTERFACE_NAME" value="CheckIdStatus"/>
+         <property name="API_NAME" value="Accounts"/>
+         <property name="URI" expression="fn:concat('/msisdn/',$ctx:identifier,'/status')"/>
+         <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+         <property name="TimeStamp" expression="$trp:Date"/>
+         <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+         <property name="TargetMSISDN" expression="$trp:X-Account-Id-MSISDN"/>
+         <property name="TargetCNIC" expression="$trp:X-Account-Id-CNIC"/>
+         <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+         <property name="X-Correlation-ID" scope="transport" action="remove"/>
+         <sequence key="RemoveHeaders"/>
+         <header name="To" scope="default" expression="$ctx:CACHE_URI"/>
+         <log level="custom">
+            <property name="CachingLog"
+                      value="***** Before hash generating for DB Caching *****"/>
+            <property name="To-var" expression="get-property('To')"/>
+            <property name="Caching-URI" expression="$ctx:CACHE_URI"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID'"/>
+         </log>
+         <axis2ns446:persistenceCache xmlns:axis2ns446="http://ws.apache.org/ns/synapse"
+                                      id="idstatus"
+                                      datasource="jdbc/WSO2_CACHE_MEDIATOR_DS_MFS"
+                                      flow="request"
+                                      hashGenerator="org.wso2.carbon.mediator.cache.digest.REQUESTHASHGenerator"/>
+         <clone continueParent="true">
+            <target sequence="LOG_REQUEST_MFS_LOGGING"/>
+         </clone>
+         <class name="com.wso2.esb.mfs.checkidstatus.QueryBalanceIN"/>
+         <log level="custom">
+            <property name="After class" value="****"/>
+            <property name="Date" expression="$ctx:dateconverted"/>
+            <property name="pin" expression="$ctx:decryptmpin"/>
+         </log>
+         <payloadFactory media-type="xml">
+            <format key="conf:/repository/esb/checkidentity"/>
+            <args>
+               <arg evaluator="xml" expression="$ctx:identifier"/>
+               <arg evaluator="xml" expression="$ctx:decryptmpin"/>
+               <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+               <arg evaluator="xml" expression="$ctx:TargetMSISDN"/>
+               <arg evaluator="xml" expression="$ctx:TargetCNIC"/>
+               <arg evaluator="xml" expression="$ctx:dateconverted"/>
+            </args>
+         </payloadFactory>
+         <enrich>
+            <source type="envelope" clone="true"/>
+            <target type="property" property="LOG_RESPONSE"/>
+         </enrich>
+         <log level="custom">
+            <property name="request" expression="$ctx:LOG_RESPONSE"/>
+         </log>
+         <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+         <property name="messageType" value="text/xml"/>
+         <call>
+            <endpoint key="CPS"/>
+         </call>
+         <property name="messageType" value="application/xml" scope="axis2"/>
+         <property xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                   name="CDATAPAYLOAD"
+                   expression="//res:ResponseMsg"
+                   scope="default"
+                   type="OM"/>
+         <enrich>
+            <source type="property" clone="true" property="CDATAPAYLOAD"/>
+            <target xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                    xpath="//res:ResponseMsg/text()"/>
+         </enrich>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseCode"
+                   expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseDesc"
+                   expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+         <switch source="get-property('ResponseCode')">
+            <case regex="0"><!--check response code case 0--><class name="com.wso2.esb.mfs.checkidstatus.checkresponse"/>
+               <switch source="$ctx:resultCode1">
+                  <case regex="0">
+                     <payloadFactory media-type="json">
+                        <format>{  "accountStatus": "$1",  "subStatus": "",  "lei": ""}</format>
+                        <args>
+                           <arg evaluator="xml" expression="$ctx:identityStatusVal"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="LOG_RESPONSE_STATUS" value="SUCCESS"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <property name="HTTP_SC" value="200" scope="axis2" type="STRING"/>
+                     <property name="RESPONSE" value="true"/>
+                     <axis2ns448:persistenceCache xmlns:axis2ns448="http://ws.apache.org/ns/synapse"
+                                                  id="idstatus"
+                                                  datasource="jdbc/WSO2_CACHE_MEDIATOR_DS_MFS"
+                                                  flow="response"
+                                                  statusCodes="200"/>
+                     <send/>
+                  </case>
+                  <default>
+                     <property name="ResultCode1" expression="$ctx:resultCode1"/>
+                     <class name="com.wso2.esb.mfs.errorhandling.ErrorHandling"/>
+                     <log level="custom">
+                        <property name="ResultCode1" expression="$ctx:resultCode1"/>
+                        <property name="errorDesc" expression="$ctx:errorDesc"/>
+                        <property name="failReason" expression="$ctx:failReason"/>
+                        <property name="resultCode" expression="$ctx:resultCode"/>
+                     </log>
+                     <property name="concatedresponse"
+                               expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                     <payloadFactory media-type="json">
+                        <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                        <args>
+                           <arg value="Validation"/>
+                           <arg evaluator="xml" expression="$ctx:statusCode"/>
+                           <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                           <arg evaluator="xml" expression="$ctx:urrentTime"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                     <property name="HTTP_SC"
+                               expression="$ctx:statusCode"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" action="remove"/>
+                     <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                  </default>
+               </switch>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </case>
+            <default>
+               <log level="custom">
+                  <property name="After class" value="****"/>
+                  <property name="Date" expression="$ctx:ResponseCode"/>
+                  <property name="pin" expression="$ctx:ResponseDesc"/>
+               </log>
+               <!--check response code default--><payloadFactory media-type="json">
+                  <format> {  "errorCategory": "Validation",  "errorCode": "$1",  "errorDescription": "$2",  "errorDateTime": "$3"  }   </format>
+                  <args>
+                     <arg evaluator="xml" expression="$ctx:ResponseCode"/>
+                     <arg evaluator="xml" expression="$ctx:ResponseDesc"/>
+                     <arg evaluator="xml" expression="$ctx:currentTime"/>
+                  </args>
+               </payloadFactory>
+               <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+               <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </default>
+         </switch>
+      </inSequence>
+      <outSequence/>
+      <faultSequence>
+         <axis2ns451:persistenceCache xmlns:axis2ns451="http://ws.apache.org/ns/synapse"
+                                      id="idstatus"
+                                      datasource="jdbc/WSO2_CACHE_MEDIATOR_DS_MFS"
+                                      flow="fault">
+            <onDBHit>
+               <property name="messageType" value="application/json" scope="axis2"/>
+               <property name="HTTP_SC" value="201" scope="axis2" type="STRING"/>
+               <respond/>
+            </onDBHit>
+         </axis2ns451:persistenceCache>
+         <log level="custom">
+            <property name="Fault" value="Logging in Fault"/>
+         </log>
+         <switch xmlns:ns="http://org.apache.synapse/xsd"
+                 xmlns:ns3="http://org.apache.synapse/xsd"
+                 source="$ctx:ERROR_CODE">
+            <case regex="101503|101504">
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside case 1 of fault switch"/>
+               </log>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam not Available.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="503" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </case>
+            <case regex="101508">
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside case 2 of fault switch"/>
+               </log>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam not Available.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="504" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </case>
+            <default>
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside default case of fault switch"/>
+               </log>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam Failure.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="500" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </default>
+         </switch>
+         <clone continueParent="true">
+            <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+         </clone>
+         <send/>
+      </faultSequence>
+   </resource>
+   <resource methods="GET" uri-template="/msisdn/{msisdn}/statemententries">
+      <inSequence>
+         <property name="transactionName" value="MiniStatement"/>
+         <log level="custom">
+            <property name="=========== FLOW STARTED OF MINI STATEMENT VIA SMS============="
+                      value="****"/>
+            <property name="accountId" expression="$ctx:uri.var.msisdn"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+            <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+            <property name="Date" expression="$trp:Request-Date"/>
+            <property name="cnic" expression="$trp:cnic"/>
+         </log>
+         <property name="accountId" expression="$ctx:uri.var.msisdn"/>
+         <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+         <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="cnic" expression="$trp:cnic"/>
+         <clone continueParent="true">
+            <target sequence="LOG_REQUEST_MFS_LOGGING"/>
+         </clone>
+         <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+         <class name="com.arcana.validation.userid.UseridValidation"/>
+         <class name="com.arcanainfo.wso2.esb.ministatement.MiniStatementIn"/>
+         <payloadFactory media-type="xml">
+            <format key="conf:/repository/esb/ministatementreg"/>
+            <args>
+               <arg evaluator="xml" expression="$ctx:accountId"/>
+               <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+               <arg evaluator="xml" expression="$ctx:decryptmpin"/>
+               <arg evaluator="xml" expression="$ctx:dateconverted"/>
+            </args>
+         </payloadFactory>
+         <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+         <property name="messageType" value="text/xml"/>
+         <call>
+            <endpoint key="CPS"/>
+         </call>
+         <log level="custom">
+            <property name="=========== after external call=============" value="****"/>
+         </log>
+         <property name="messageType" value="application/xml" scope="axis2"/>
+         <property xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                   name="CDATAPAYLOAD"
+                   expression="//res:ResponseMsg"
+                   scope="default"
+                   type="OM"/>
+         <enrich>
+            <source type="property" clone="true" property="CDATAPAYLOAD"/>
+            <target xmlns:res="http://cps.huawei.com/cpsinterface/request"
+                    xpath="//res:ResponseMsg/text()"/>
+         </enrich>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseCode"
+                   expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseDesc"
+                   expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+         <switch source="get-property('ResponseCode')">
+            <case regex="0"><!--check response code case 0--><class name="com.arcanainfo.wso2.esb.ministatement.MiniStatementSmsCheckResponse"/>
+               <switch source="$ctx:resultCode">
+                  <case regex="0">
+                     <payloadFactory media-type="json">
+                        <format>$1</format>
+                        <args>
+                           <arg evaluator="xml" expression="$ctx:value"/>
+                           <arg value="N/A"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="LOG_RESPONSE_STATUS" value="SUCCESS"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="HTTP_SC" value="200" scope="axis2" type="STRING"/>
+                     <send/>
+                  </case>
+                  <default>
+                     <property name="ResultCode1" expression="$ctx:resultCode"/>
+                     <class name="com.wso2.esb.mfs.errorhandling.ErrorHandling"/>
+                     <property name="concatedresponse"
+                               expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                     <payloadFactory media-type="json">
+                        <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                        <args>
+                           <arg value="Validation"/>
+                           <arg evaluator="xml" expression="$ctx:statusCode"/>
+                           <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                           <arg evaluator="xml" expression="$ctx:currentTime"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                     <property name="HTTP_SC"
+                               expression="$ctx:statusCode"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                     <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                     <header name="To" scope="default" action="remove"/>
+                     <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <send/>
+                  </default>
+               </switch>
+            </case>
+            <default><!--check response code default--><payloadFactory media-type="json">
+                  <format> {  "errorCategory": "Validation",  "errorCode": "$1",  "errorDescription": "$2",  "errorDateTime": "$3"  }   </format>
+                  <args>
+                     <arg evaluator="xml" expression="$ctx:ResponseCode"/>
+                     <arg evaluator="xml" expression="$ctx:ResponseDesc"/>
+                     <arg evaluator="xml" expression="$ctx:currentTime"/>
+                  </args>
+               </payloadFactory>
+               <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+               <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <send/>
+            </default>
+         </switch>
+         <log level="custom">
+            <property name="=========== FLOW END OF MINI STATEMENT VIA SMS============="
+                      value="****"/>
+         </log>
+      </inSequence>
+      <faultSequence>
+         <switch xmlns:ns="http://org.apache.synapse/xsd"
+                 xmlns:ns3="http://org.apache.synapse/xsd"
+                 source="$ctx:ERROR_CODE">
+            <case regex="101503|101504">
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside case 1 of fault switch"/>
+               </log>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam not Available.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="503" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </case>
+            <case regex="101508">
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside case 2 of fault switch"/>
+               </log>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam not Available.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="504" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </case>
+            <default>
+               <log level="custom">
+                  <property name="Fault Switch --&gt;;;;" value="Inside default case of fault switch"/>
+               </log>
+               <payloadFactory media-type="json">
+                  <format>{           "errorCategory": "Validation",           "errorCode": "503",           "errorDescription": "Downsteam Failure.",           "errorDateTime": "$1"         }</format>
+                  <args>
+                     <arg evaluator="xml" expression="get-property('currentTime')"/>
+                  </args>
+               </payloadFactory>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+               <property name="HTTP_SC" value="500" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+               <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+               <header name="To" scope="default" action="remove"/>
+            </default>
+         </switch>
+         <send/>
+      </faultSequence>
+   </resource>
+   <resource methods="POST"
+             uri-template="/msisdn/{msisdn}/bills/{billReference}/payments">
+      <inSequence>
+         <log level="custom">
+            <property name="=========== FLOW STARTED" value="****"/>
+            <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+            <property name="TimeStamp"
+                      expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+            <property name="amount" expression="json-eval($.paidAmount)"/>
+            <property name="customerReference" expression="json-eval($.paymentType)"/>
+            <property name="paymentReferenceType"
+                      expression="json-eval($.supplementaryBillReferenceDetails[0].paymentReferenceType)"/>
+            <property name="paymentReferenceValue"
+                      expression="json-eval($.supplementaryBillReferenceDetails[0].paymentReferenceValue)"/>
+            <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+            <property name="Date" expression="$trp:Request-Date"/>
+            <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+            <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+         </log>
+         <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+         <property name="Date" expression="$trp:Request-Date"/>
+         <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+         <property name="transactionName" value="BillPayment"/>
+         <property name="customerReference" expression="json-eval($.paymentType)"/>
+         <property name="amountpay" expression="json-eval($.paidAmount)"/>
+         <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+         <property name="TimeStamp"
+                   expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         <property name="Time" expression="get-property('SYSTEM_DATE','yyyyMMddHHmmss')"/>
+         <property name="identifier" expression="$ctx:uri.var.msisdn"/>
+         <property name="billReference" expression="$ctx:uri.var.billReference"/>
+         <property name="OriginatorConversationID" expression="$trp:X-Correlation-ID"/>
+         <property name="paymentReferenceValue"
+                   expression="json-eval($.supplementaryBillReferenceDetails[0].paymentReferenceValue)"/>
+         <clone continueParent="true">
+            <target sequence="LOG_REQUEST_MFS_LOGGING"/>
+         </clone>
+         <class name="com.arcana.validation.userid.UseridValidation"/>
+         <class name="com.wso2.esb.mfs.billpyament.QueryBalanceIN"/>
+         <payloadFactory media-type="xml">
+            <format key="conf:/repository/esb/billpayment1"/>
+            <args>
+               <arg evaluator="xml" expression="$ctx:identifier"/>
+               <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+               <arg evaluator="xml" expression="$ctx:identifier"/>
+               <arg evaluator="xml" expression="$ctx:billReference"/>
+               <arg evaluator="xml" expression="$ctx:paymentReferenceValue"/>
+               <arg evaluator="xml" expression="$ctx:dateconverted"/>
+            </args>
+         </payloadFactory>
+         <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+         <property name="messageType" value="text/xml"/>
+         <call>
+            <endpoint key="CPS"/>
+         </call>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="CDATAPAYLOAD"
+                   expression="//req:ResponseMsg"
+                   scope="default"
+                   type="OM"/>
+         <enrich>
+            <source type="property" clone="true" property="CDATAPAYLOAD"/>
+            <target xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                    xpath="//req:ResponseMsg/text()"/>
+         </enrich>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseCode"
+                   expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ConversationID"
+                   expression="$body//req:ResponseMsg/Response/ConversationID"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ResponseDesc"
+                   expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="OriginatorConversationID"
+                   expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+         <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                   name="ServiceStatus"
+                   expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+         <log level="custom">
+            <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                      name="ResponseCode"
+                      expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+            <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                      name="ConversationID"
+                      expression="$body//req:ResponseMsg/Response/ConversationID"/>
+            <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                      name="ResponseDesc"
+                      expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+            <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                      name="OriginatorConversationID"
+                      expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+            <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                      name="ServiceStatus"
+                      expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+         </log>
+         <switch source="get-property('ResponseCode')">
+            <case regex="0"><!--response code 0 case--><switch source="get-property('customerReference')">
+                  <case regex="fullpayment"><!--fullpayment check case --><class name="com.wso2.esb.mfs.billpyament.checkresponse"/>
+                     <property name="resultCode1" expression="$ctx:resultCode1"/>
+                     <switch source="$ctx:resultCode1">
+                        <case regex="0"><!--checkresponse case 0--><log level="custom">
+                              <property name="=====Flow started" value="======"/>
+                              <property name="X-User-Credential-1" expression="$ctx:X-User-Credential-1"/>
+                              <property name="OriginatorConversationID" expression="$ctx:TimeStamp"/>
+                              <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+                              <property name="Date" expression="$trp:Request-Date"/>
+                           </log>
+                           <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+                           <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+                           <property name="Date" expression="$trp:Request-Date')"/>
+                           <property name="X-User-Credential-1" expression="$trp:X-User-Credential-1"/>
+                           <property name="OriginatorConversationID" expression="$ctx:TimeOriginator"/>
+                           <class name="com.wso2.esb.mfs.confirmtrx.QueryBalanceIN"/>
+                           <log level="custom">
+                              <property name="After class" value="****"/>
+                              <property name="pin" expression="$ctx:decryptmpin"/>
+                              <property name="Date" expression="$ctx:dateconverted"/>
+                           </log>
+                           <payloadFactory media-type="xml">
+                              <format key="conf:/repository/esb/confirmtrxfullpayment"/>
+                              <args>
+                                 <arg evaluator="xml" expression="$ctx:identifier"/>
+                                 <arg evaluator="xml" expression="$ctx:decryptmpin"/>
+                                 <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+                                 <arg evaluator="xml" expression="$ctx:dateconverted"/>
+                                 <arg evaluator="xml" expression="$ctx:Transaction_ID"/>
+                              </args>
+                           </payloadFactory>
+                           <enrich>
+                              <source type="envelope" clone="true"/>
+                              <target type="property" property="LOG_RESPONSE"/>
+                           </enrich>
+                           <log level="custom">
+                              <property name="Request" expression="$ctx:LOG_RESPONSE"/>
+                           </log>
+                           <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+                           <property name="messageType" value="text/xml"/>
+                           <call>
+                              <endpoint>
+                                 <address uri="http://10.227.22.148:8081/payment/services/RequestMgrService"
+                                          format="soap11"/>
+                              </endpoint>
+                           </call>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="CDATAPAYLOAD"
+                                     expression="//req:ResponseMsg"
+                                     scope="default"
+                                     type="OM"/>
+                           <enrich>
+                              <source type="property" clone="true" property="CDATAPAYLOAD"/>
+                              <target xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                      xpath="//req:ResponseMsg/text()"/>
+                           </enrich>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ResponseCode"
+                                     expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ConversationID"
+                                     expression="$body//req:ResponseMsg/Response/ConversationID"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ResponseDesc"
+                                     expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="OriginatorConversationID"
+                                     expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ServiceStatus"
+                                     expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+                           <log level="custom">
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ResponseCode"
+                                        expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ConversationID"
+                                        expression="$body//req:ResponseMsg/Response/ConversationID"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ResponseDesc"
+                                        expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="OriginatorConversationID"
+                                        expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ServiceStatus"
+                                        expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+                           </log>
+                           <class name="com.wso2.esb.mfs.confirmtrx.checkresponse"/>
+                           <switch source="get-property('resultCode1')">
+                              <case regex="0"><!--confirmtrxfullpayment case 0 --><payloadFactory media-type="json">
+                                    <format>{  "currency": "PKR",  "paidAmount": "$1",  "customerReference": "", "paymentType": "$2",  "supplementaryBillReferenceDetails": [    {      "paymentReferenceType": "BillCompany",      "paymentReferenceValue": "$3"    }  ]}</format>
+                                    <args>
+                                       <arg evaluator="xml" expression="$ctx:amountpay"/>
+                                       <arg evaluator="xml" expression="$ctx:customerReference"/>
+                                       <arg evaluator="xml" expression="$ctx:paymentReferenceValue"/>
+                                    </args>
+                                 </payloadFactory>
+                              </case>
+                              <default><!--confirmtrxfullpayment default --><property name="ResultCode1" expression="$ctx:resultCode1"/>
+                                 <class name="com.wso2.esb.mfs.errorhandlingtrx.ErrorHandling"/>
+                                 <property name="concatedresponse"
+                                           expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                                 <payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC"
+                                           expression="$ctx:statusCode"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </default>
+                           </switch>
+                           <!--confirmtrxfullpayment switch closed --></case>
+                        <default><!--check response default --><property name="ResultCode1" expression="$ctx:resultCode1"/>
+                           <class name="com.wso2.esb.mfs.errorhandlingtrx.ErrorHandling"/>
+                           <property name="concatedresponse"
+                                     expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                           <switch source="$ctx:flag">
+                              <case regex="0"><!--case 0--><payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC"
+                                           expression="$ctx:statusCode"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </case>
+                              <case regex="2"><!--case 2 --><payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC" value="404" scope="axis2" type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </case>
+                              <default/>
+                           </switch>
+                           <!--check flag switch close--><send/>
+                        </default>
+                     </switch>
+                     <!--checkresponse switch close--><send/>
+                  </case>
+                  <case regex="partialpayment"><!--partialpayment check case --><class name="com.wso2.esb.mfs.billpyament.checkresponse"/>
+                     <property name="resultCode1" expression="$ctx:resultCode1"/>
+                     <switch source="$ctx:resultCode1">
+                        <case regex="0"><!--checkresponse case 0--><log level="custom">
+                              <property name="=====Flow started" value="======"/>
+                              <property name="X-User-Credential-1" expression="$ctx:X-User-Credential-1"/>
+                              <property name="OriginatorConversationID" expression="$ctx:TimeStamp"/>
+                              <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+                              <property name="Date" expression="$trp:Request-Date"/>
+                           </log>
+                           <script language="js">var now = new Date();               var isoDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();                                         mc.setProperty("currentTime",isoDate);                                                         var log = mc.getServiceLog();                                                                                    log.info("Logging inside Script Mediator " + isoDate);</script>
+                           <property name="TimeOriginator" expression="get-property('SYSTEM_TIME')"/>
+                           <property name="Date" expression="$trp:Request-Date"/>
+                           <property name="X-User-Credential-1" expression="$ctx:X-User-Credential-1"/>
+                           <property name="OriginatorConversationID" expression="$ctx:TimeOriginator"/>
+                           <class name="com.wso2.esb.mfs.confirmtrx.QueryBalanceIN"/>
+                           <log level="custom">
+                              <property name="After class" value="****"/>
+                              <property name="Date" expression="$ctx:dateconverted"/>
+                              <property name="pin" expression="$ctx:decryptmpin"/>
+                           </log>
+                           <payloadFactory media-type="xml">
+                              <format key="conf:/repository/esb/confirmtransactionc2c"/>
+                              <args>
+                                 <arg evaluator="xml" expression="$ctx:identifier"/>
+                                 <arg evaluator="xml" expression="$ctx:decryptmpin"/>
+                                 <arg evaluator="xml" expression="$ctx:OriginatorConversationID"/>
+                                 <arg evaluator="xml" expression="$ctx:dateconverted"/>
+                                 <arg evaluator="xml" expression="$ctx:Transaction_ID"/>
+                                 <arg evaluator="xml" expression="$ctx:amountpay"/>
+                              </args>
+                           </payloadFactory>
+                           <enrich>
+                              <source type="envelope" clone="true"/>
+                              <target type="property" property="LOG_RESPONSE"/>
+                           </enrich>
+                           <log level="custom">
+                              <property name="Request" expression="$ctx:LOG_RESPONSE"/>
+                           </log>
+                           <header name="SOAPAction" scope="transport" value="GenericAPIRequest"/>
+                           <property name="messageType" value="text/xml"/>
+                           <call>
+                              <endpoint>
+                                 <address uri="http://10.227.22.148:8081/payment/services/RequestMgrService"
+                                          format="soap11"/>
+                              </endpoint>
+                           </call>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="CDATAPAYLOAD"
+                                     expression="//req:ResponseMsg"
+                                     scope="default"
+                                     type="OM"/>
+                           <enrich>
+                              <source type="property" clone="true" property="CDATAPAYLOAD"/>
+                              <target xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                      xpath="//req:ResponseMsg/text()"/>
+                           </enrich>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ResponseCode"
+                                     expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ConversationID"
+                                     expression="$body//req:ResponseMsg/Response/ConversationID"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ResponseDesc"
+                                     expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="OriginatorConversationID"
+                                     expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+                           <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                     name="ServiceStatus"
+                                     expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+                           <log level="custom">
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ResponseCode"
+                                        expression="$body//req:ResponseMsg/Response/ResponseCode"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ConversationID"
+                                        expression="$body//req:ResponseMsg/Response/ConversationID"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ResponseDesc"
+                                        expression="$body//req:ResponseMsg/Response/ResponseDesc"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="OriginatorConversationID"
+                                        expression="$body//req:ResponseMsg/Response/OriginatorConversationID"/>
+                              <property xmlns:req="http://cps.huawei.com/cpsinterface/request"
+                                        name="ServiceStatus"
+                                        expression="$body//req:ResponseMsg/Response/ServiceStatus"/>
+                           </log>
+                           <class name="com.wso2.esb.mfs.confirmtrx.checkresponse"/>
+                           <switch source="get-property('resultCode1')">
+                              <case regex="0"><!--confirmtrxfullpayment case 0 --><payloadFactory media-type="json">
+                                    <format>{  "currency": "PKR",  "paidAmount": "$1",  "customerReference": "", "paymentType": "$2",   "supplementaryBillReferenceDetails": [    {      "paymentReferenceType": "BillCompany",      "paymentReferenceValue": "$3"    }  ]}</format>
+                                    <args>
+                                       <arg evaluator="xml" expression="$ctx:amountpay"/>
+                                       <arg evaluator="xml" expression="$ctx:customerReference"/>
+                                       <arg evaluator="xml" expression="$ctx:paymentReferenceValue"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC" value="201" scope="axis2" type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="SUCCESS"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                              </case>
+                              <default><!--confirmtrxfullpayment default --><property name="ResultCode1" expression="$ctx:resultCode1"/>
+                                 <class name="com.wso2.esb.mfs.errorhandlingtrx.ErrorHandling"/>
+                                 <property name="concatedresponse"
+                                           expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                                 <payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC"
+                                           expression="$ctx:statusCode"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </default>
+                           </switch>
+                           <!--confirmtrxfullpayment switch closed --></case>
+                        <default><!--check response default --><property name="ResultCode1" expression="$ctx:resultCode1"/>
+                           <class name="com.wso2.esb.mfs.errorhandlingtrx.ErrorHandling"/>
+                           <property name="concatedresponse"
+                                     expression="fn:concat($ctx:failReason,$ctx:errorDesc)"/>
+                           <switch source="get-property('flag')">
+                              <case regex="0"><!--case 0--><payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC"
+                                           expression="$ctx:statusCode"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </case>
+                              <case regex="2"><!--case 2 --><payloadFactory media-type="json">
+                                    <format> {  "errorCategory": "$1",  "errorCode": "$2",  "errorDescription": "$3",  "errorDateTime": "$4"  }  </format>
+                                    <args>
+                                       <arg value="Validation"/>
+                                       <arg evaluator="xml" expression="$ctx:statusCode"/>
+                                       <arg evaluator="xml" expression="$ctx:concatedresponse"/>
+                                       <arg evaluator="xml" expression="$ctx:currentTime"/>
+                                    </args>
+                                 </payloadFactory>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" expression="get-property('ReplyTo')"/>
+                                 <property name="HTTP_SC" value="404" scope="axis2" type="STRING"/>
+                                 <property name="messageType"
+                                           value="application/json"
+                                           scope="axis2"
+                                           type="STRING"/>
+                                 <property name="NO_ENTITY_BODY" scope="axis2" action="remove"/>
+                                 <property name="RESPONSE" value="true" scope="default" type="STRING"/>
+                                 <header name="To" scope="default" action="remove"/>
+                                 <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                                 <clone continueParent="true">
+                                    <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                                 </clone>
+                                 <send/>
+                              </case>
+                              <default/>
+                           </switch>
+                           <!--check flag switch close--><send/>
+                        </default>
+                     </switch>
+                     <!--checkresponse switch close--><send/>
+                  </case>
+                  <default><!--payment method check default --><payloadFactory media-type="json">
+                        <format> {  "errorCategory": "PaymentType",  "errorCode": "400",  "errorDescription": "Payment Type Invalid",  "errorDateTime": "$1"  }   </format>
+                        <args>
+                           <arg evaluator="xml" expression="$ctx:currentTime"/>
+                        </args>
+                     </payloadFactory>
+                     <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+                     <property name="messageType"
+                               value="application/json"
+                               scope="axis2"
+                               type="STRING"/>
+                     <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+                     <clone continueParent="true">
+                        <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+                     </clone>
+                     <respond/>
+                  </default>
+               </switch>
+               <!--customerReference switch close--></case>
+            <default><!--responsecode default--><payloadFactory media-type="json">
+                  <format> {  "errorCategory": "Validation",  "errorCode": "$1",  "errorDescription": "$2",  "errorDateTime": "$3"  }   </format>
+                  <args>
+                     <arg evaluator="xml" expression="$ctx:ResponseCode"/>
+                     <arg evaluator="xml" expression="$ctx:ResponseDesc"/>
+                     <arg evaluator="xml" expression="$ctx:currentTime"/>
+                  </args>
+               </payloadFactory>
+               <property name="HTTP_SC" value="400" scope="axis2" type="STRING"/>
+               <property name="messageType"
+                         value="application/json"
+                         scope="axis2"
+                         type="STRING"/>
+               <property name="LOG_RESPONSE_STATUS" value="FAILURE"/>
+               <clone continueParent="true">
+                  <target sequence="LOG_RESPONSE_MFS_LOGGING"/>
+               </clone>
+               <respond/>
+            </default>
+         </switch>
+      </inSequence>
+   </resource>
+</api>
